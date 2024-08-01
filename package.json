@@ -1,0 +1,36 @@
+{
+  "name": "too-many-plugins",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpx unbuild",
+    "preview": "pnpm build && node dist/index.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.4",
+    "unbuild": "^2.0.0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.14",
+    "consola": "^3.2.3",
+    "js-yaml": "^4.1.0",
+    "unstorage": "^1.10.2"
+  }
+}
