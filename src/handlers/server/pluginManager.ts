@@ -23,21 +23,25 @@ export async function installOrUpdatePlugin(
 
   // 获取新插件信息
   const newPluginInfo = await getPluginInfoWithCache(pluginPath);
+  const newPluginInfoThisPlatform =
+    newPluginInfo.find((p) => {
+      p.platform.includes(server.platform);
+    }) ?? newPluginInfo[0];
 
   // 查找并删除同名插件（如果存在）
   const existingPlugins = await listPlugins(serverId);
-  const existingPlugin = existingPlugins.find(
-    (p) => p.info.name === newPluginInfo.name
+  const sameNamePlugin = existingPlugins.find(
+    (p) => p.info.name === newPluginInfoThisPlatform.name
   );
-  if (existingPlugin) {
-    await fs.unlink(existingPlugin.jarPath);
+  if (sameNamePlugin) {
+    await fs.unlink(sameNamePlugin.jarPath);
   }
 
   // 复制新插件
   await fs.copyFile(pluginPath, targetPath);
 
   const hash = await getFileHash(targetPath);
-  return { info: newPluginInfo, hash, jarPath: targetPath };
+  return { info: newPluginInfoThisPlatform, hash, jarPath: targetPath };
 }
 
 /**
@@ -75,7 +79,11 @@ export async function listPlugins(serverId: string): Promise<PluginEntry[]> {
   for (const jarPath of jarFiles) {
     const info = await getPluginInfoWithCache(jarPath);
     const hash = await getFileHash(jarPath);
-    plugins.push({ info, hash, jarPath });
+    const thisPlatformInfo =
+      info.find((p) => {
+        p.platform.includes(server.platform);
+      }) ?? info[0];
+    plugins.push({ info: thisPlatformInfo, hash, jarPath });
   }
 
   return plugins;

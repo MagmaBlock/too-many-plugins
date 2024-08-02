@@ -25,7 +25,7 @@ export async function getFileHash(filePath: string): Promise<string> {
  */
 export async function getPluginInfoWithCache(
   jarPath: string
-): Promise<PluginInfo> {
+): Promise<PluginInfo[]> {
   const hash = await getFileHash(jarPath);
   const cache =
     ((await storage.getItem(PLUGIN_CACHE_KEY)) as PluginCache) || {};
@@ -34,7 +34,7 @@ export async function getPluginInfoWithCache(
     return cache[jarPath].info;
   }
 
-  const info = getPluginInfo(jarPath)[0]; // 假设每个jar只包含一个插件
+  const info = getPluginInfo(jarPath);
   cache[jarPath] = { info, hash };
   await storage.setItem(PLUGIN_CACHE_KEY, cache);
 

@@ -59,7 +59,11 @@ libraryCommand
     try {
       const library = await libraryManager.getLibrary(id);
       library.plugins.forEach((plugin) => {
-        console.log(`${plugin.info.name} (${plugin.info.version})`);
+        console.log(
+          `[${plugin.info.platform}] ${plugin.info.name} v${
+            plugin.info.version
+          } by ${plugin.info.authors.join(", ")}`
+        );
       });
     } catch (error) {
       console.error(`❌ Error: ${(error as any)?.message ?? error}`);

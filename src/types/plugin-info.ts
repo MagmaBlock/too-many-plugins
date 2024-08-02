@@ -11,8 +11,10 @@ export type PluginInfo = {
 };
 
 export interface PluginCacheEntry {
-  info: PluginInfo;
+  info: PluginInfo[];
   hash: string;
 }
 
-export type PluginCache = Record<string, PluginCacheEntry>;
+export interface PluginCache {
+  [jarPath: string]: PluginCacheEntry;
+}

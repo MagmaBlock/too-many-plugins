@@ -123,21 +123,23 @@ export async function updateLibraryIndex(
 
     if (!rebuild && existingHashes.has(hash)) {
       // 文件已经被索引过，保留现有索引
-      const existingPlugin = library.plugins.find(
+      const existingPlugins = library.plugins.filter(
         (plugin) => plugin.hash === hash
       );
-      if (existingPlugin) {
-        newPlugins.push(existingPlugin);
+      if (existingPlugins.length > 0) {
+        newPlugins.push(...existingPlugins);
       }
       continue;
     }
 
-    const info = await getPluginInfoWithCache(jarFile);
-    newPlugins.push({
-      info,
-      hash,
-      jarPath: jarFile,
-    });
+    const infoList = await getPluginInfoWithCache(jarFile);
+    for (const info of infoList) {
+      newPlugins.push({
+        info,
+        hash,
+        jarPath: jarFile,
+      });
+    }
   }
 
   // 移除无效的索引
