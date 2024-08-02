@@ -35,8 +35,11 @@ export async function addLibrary(
   }
 
   const absolutePath = path.resolve(libraryPath);
-  if (!fs.existsSync(absolutePath)) {
-    throw new Error("嘎！指定路径不存在");
+  if (
+    !fs.existsSync(absolutePath) ||
+    !fs.statSync(absolutePath).isDirectory()
+  ) {
+    throw new Error("嘎！指定文件夹不存在");
   }
 
   const library: Library = {

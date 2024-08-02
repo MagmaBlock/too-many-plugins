@@ -17,6 +17,10 @@
     "build": "pnpx unbuild",
     "preview": "pnpm build && node dist/index.mjs"
   },
+  "bin": {
+    "too-many-plugins": "./dist/index.mjs",
+    "tmp": "./dist/index.mjs"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

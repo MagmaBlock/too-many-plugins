@@ -21,6 +21,8 @@ export function getPluginInfo(jarPath: string): PluginInfo[] {
   const commonInfo = getCommonPluginInfo(jarPath);
   if (commonInfo) pluginInfos.push(commonInfo);
 
+  console.log(`[debug] ${jarPath}, ${pluginInfos}`);
+
   return pluginInfos;
 }
 
