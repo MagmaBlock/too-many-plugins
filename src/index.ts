@@ -60,9 +60,7 @@ libraryCommand
       const library = await libraryManager.getLibrary(id);
       library.plugins.forEach((plugin) => {
         console.log(
-          `[${plugin.info.platform}] ${plugin.info.name} v${
-            plugin.info.version
-          } by ${plugin.info.authors.join(", ")}`
+          `${plugin.info.name} v${plugin.info.version} (${plugin.info.platform}) (${plugin.jarPath})`
         );
       });
     } catch (error) {
@@ -78,7 +76,7 @@ libraryCommand
     try {
       if (id) {
         await libraryManager.updateLibraryIndex(id, options.rebuild);
-        console.log(`✅ Library indexed: ${id}`);
+        console.log(`✅ Library ${id} indexed`);
       } else {
         const libraries = await libraryManager.getAllLibraries();
         for (const [libraryId, _] of Object.entries(libraries)) {
@@ -92,17 +90,27 @@ libraryCommand
   });
 
 libraryCommand
-  .command("search <query>")
-  .option("-l, --library <id>", "Search in a specific library")
+  .command("search")
+  .option("-n, --name <name>", "Plugin name")
+  .option("-v, --plugin-version <version>", "Plugin version")
+  .option("-l, --latest", "Show only latest versions")
+  .option("-p, --platform <platform>", "Filter by platform")
+  .option("-lib, --library <id>", "Search in a specific library")
   .description("Search for a plugin")
-  .action(async (query, options) => {
+  .action(async (options) => {
     try {
-      const results = await libraryManager.findPlugin(query, options.library);
-      results.forEach((result) => {
-        console.log(
-          `${result.plugin.info.name} (${result.plugin.info.version}) - ${result.libraryId}`
-        );
-      });
+      const results = await libraryManager.findPlugin(options);
+      if (results.length === 0) {
+        console.log("No plugins found matching the criteria.");
+      } else {
+        results.forEach((plugin) => {
+          console.log(
+            `${plugin.info.name} v${
+              plugin.info.version
+            } (${plugin.info.platform.join(", ")}) (${plugin.jarPath})`
+          );
+        });
+      }
     } catch (error) {
       console.error(`❌ Error: ${(error as any)?.message ?? error}`);
     }
@@ -111,51 +119,58 @@ libraryCommand
 libraryCommand
   .command("install")
   .requiredOption("-n, --name <name>", "Plugin name")
-  .option("-v, --version <version>", "Plugin version")
+  .option("-v, --plugin-version <version>", "Plugin version")
   .option("-l, --latest", "Install latest version")
   .option("-lib, --library <id>", "Library to search in")
-  .requiredOption("-s, --server <id>", "Server to install to")
+  .requiredOption("-s, --server <id>", "Server to install")
   .description("Install a plugin to a server")
   .action(async (options) => {
     try {
-      if (!options.version && !options.latest) {
-        throw new Error("Either --version or --latest must be specified");
+      if (!options.pluginVersion && !options.latest) {
+        throw new Error(
+          "Either --plugin-version or --latest must be specified"
+        );
       }
 
-      const results = await libraryManager.findPlugin(
-        options.name,
-        options.library
-      );
+      const server = await serverManager.getServer(options.server);
+      const results = await libraryManager.findPlugin({
+        name: options.name,
+        pluginVersion: options.version,
+        latest: options.latest,
+        platform: server.platform,
+        libraryId: options.library,
+      });
+
       if (results.length === 0) {
-        throw new Error("Plugin not found");
+        throw new Error("No matching plugins found");
       }
 
-      let pluginToInstall = results[0].plugin;
-      if (options.version) {
-        pluginToInstall = results.find(
-          (r) => r.plugin.info.version === options.version
-        )?.plugin!;
-        if (!pluginToInstall) {
-          throw new Error("Specified version not found");
-        }
-      } else if (options.latest) {
-        pluginToInstall = results.reduce((latest, current) => {
-          return libraryManager.sortVersions([
-            latest.plugin.info.version,
-            current.plugin.info.version,
-          ])[0] === latest.plugin.info.version
-            ? latest
-            : current;
-        }).plugin;
+      if (results.length > 1) {
+        console.log("Multiple matching plugins found:");
+        results.forEach((plugin) => {
+          console.log(
+            `${plugin.info.name} v${
+              plugin.info.version
+            } (${plugin.info.platform.join(", ")}) (${plugin.jarPath})`
+          );
+        });
+        throw new Error(
+          "Please specify a more precise version or use --latest"
+        );
       }
 
+      const pluginToInstall = results[0];
       await pluginManager.installOrUpdatePlugin(
         options.server,
         pluginToInstall.jarPath
       );
       console.log(
-        `✅ Plugin installed: ${pluginToInstall.info.name} (${pluginToInstall.info.version})`
+        `✅ Plugin installed: ${pluginToInstall.info.name} v${
+          pluginToInstall.info.version
+        } (${pluginToInstall.info.platform.join(", ")})`
       );
+      console.log(`Installed to server: ${server.id} (${server.platform})`);
+      console.log(`Plugin path: ${pluginToInstall.jarPath}`);
     } catch (error) {
       console.error(`❌ Error: ${(error as any)?.message ?? error}`);
     }
@@ -170,7 +185,9 @@ serverCommand
     "-p, --platform <platform>",
     "Server platform (BungeeCord, Bukkit, Velocity, Folia)"
   )
-  .description("Add a new server")
+  .description(
+    'Add a new server, "path" is the parent directory of the "plugins" folder'
+  )
   .action(async (id, path, options) => {
     try {
       const server = await serverManager.addServer(id, path, options.platform);
@@ -194,7 +211,10 @@ serverCommand
 
 serverCommand
   .command("update <id>")
-  .option("-p, --path <path>", "New server path")
+  .option(
+    "-p, --path <path>",
+    'New server path, the parent directory of the "plugins" folder'
+  )
   .option("-plat, --platform <platform>", "New server platform")
   .description("Update server information")
   .action(async (id, options) => {
@@ -223,16 +243,15 @@ serverCommand
     }
   });
 
-// 修改 Server plugin commands 部分
-const pluginsCommand = serverCommand.command("plugins <serverId>");
+const serverPluginCommand = program.command("server-plugin");
 
-pluginsCommand
-  .command("install <pluginPath>")
+serverPluginCommand
+  .command("install <serverId> <pluginPath>")
   .description("Install or update a plugin from an external JAR file")
-  .action(async (pluginPath, options) => {
+  .action(async (serverId, pluginPath) => {
     try {
       const plugin = await pluginManager.installOrUpdatePlugin(
-        options.parent.args[0],
+        serverId,
         pluginPath
       );
       console.log(
@@ -243,12 +262,12 @@ pluginsCommand
     }
   });
 
-pluginsCommand
-  .command("list")
+serverPluginCommand
+  .command("list <serverId>")
   .description("List all plugins installed on the server")
-  .action(async (options) => {
+  .action(async (serverId) => {
     try {
-      const plugins = await pluginManager.listPlugins(options.parent.args[0]);
+      const plugins = await pluginManager.listPlugins(serverId);
       plugins.forEach((plugin) => {
         console.log(`${plugin.info.name} (${plugin.info.version})`);
       });
@@ -257,24 +276,24 @@ pluginsCommand
     }
   });
 
-pluginsCommand
-  .command("remove <pluginId>")
+serverPluginCommand
+  .command("remove <serverId> <pluginId>")
   .description("Remove a plugin from the server")
-  .action(async (pluginId, options) => {
+  .action(async (serverId, pluginId) => {
     try {
-      await pluginManager.removePlugin(options.parent.args[0], pluginId);
+      await pluginManager.removePlugin(serverId, pluginId);
       console.log(`✅ Plugin removed: ${pluginId}`);
     } catch (error) {
       console.error(`❌ Error: ${(error as any)?.message ?? error}`);
     }
   });
 
-pluginsCommand
-  .command("info <pluginName>")
+serverPluginCommand
+  .command("info <serverId> <pluginName>")
   .description("Get information about a specific plugin")
-  .action(async (pluginName, options) => {
+  .action(async (serverId, pluginName) => {
     try {
-      const plugins = await pluginManager.listPlugins(options.parent.args[0]);
+      const plugins = await pluginManager.listPlugins(serverId);
       const plugin = plugins.find(
         (p) => p.info.name === pluginName || p.jarPath.endsWith(pluginName)
       );

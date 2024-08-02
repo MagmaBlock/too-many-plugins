@@ -21,8 +21,6 @@ export function getPluginInfo(jarPath: string): PluginInfo[] {
   const commonInfo = getCommonPluginInfo(jarPath);
   if (commonInfo) pluginInfos.push(commonInfo);
 
-  console.log(`[debug] ${jarPath}, ${pluginInfos}`);
-
   return pluginInfos;
 }
 
@@ -40,6 +38,10 @@ function checkClassInheritance(classContent: string): SupportedPlatform | null {
   }
   // 检查类内容是否包含Bukkit相关类，如果是则认为是Bukkit平台
   if (classContent.includes("org/bukkit/plugin/java/JavaPlugin")) {
+    return SupportedPlatform.Bukkit;
+  }
+  // 检查类内容是否包含Bukkit相关类，如果是则认为是Bukkit平台
+  if (classContent.includes("org/bukkit/Bukkit")) {
     return SupportedPlatform.Bukkit;
   }
   // 如果无法识别平台，则返回null
@@ -123,6 +125,13 @@ function getCommonPluginInfo(jarPath: string): PluginInfo | null {
           const platform = checkClassInheritance(classContent);
           if (platform) {
             pluginInfo.platform.push(platform);
+          }
+          if (platform === null) {
+            consola.warn(
+              `Unknown platform plugin from ${jarPath}, mark it as both Bukkit and BungeeCord.`
+            );
+            pluginInfo.platform.push(SupportedPlatform.Bukkit);
+            pluginInfo.platform.push(SupportedPlatform.BungeeCord);
           }
         } catch (error) {
           consola.error(`Error reading main class file: ${error}`);

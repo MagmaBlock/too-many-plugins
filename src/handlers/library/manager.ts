@@ -5,6 +5,7 @@ import { storage } from "../../db/db";
 import { Libraries, Library, PluginEntry } from "../../types/library";
 import { getJarFiles } from "../folder/get-jar-files";
 import { getFileHash, getPluginInfoWithCache } from "../jar/plugin-info-cache";
+import { SupportedPlatform } from "../../types/supported-platform";
 
 const LIBRARIES_KEY = "tmp:plugin:libraries";
 
@@ -143,14 +144,12 @@ export async function updateLibraryIndex(
   }
 
   // 移除无效的索引
-  if (!rebuild) {
-    library.plugins = library.plugins.filter((plugin) =>
-      validJarPaths.has(plugin.jarPath)
-    );
-  }
+  library.plugins = library.plugins.filter((plugin) =>
+    validJarPaths.has(plugin.jarPath)
+  );
 
-  // 添加新的索引
-  library.plugins = [...library.plugins, ...newPlugins];
+  // 使用新的索引替换旧的索引
+  library.plugins = newPlugins;
 
   await storage.setItem(LIBRARIES_KEY, libraries);
 
@@ -158,38 +157,71 @@ export async function updateLibraryIndex(
 }
 
 /**
- * 在指定的插件库或所有插件库中查找指定的插件（大小写不敏感）
- * @param query 要查找的插件名称，大小写不敏感
- * @param libraryId 可选参数，指定要搜索的库的 ID。如果不提供，则在所有库中搜索
+ * 插件过滤
+ * @param filters 查询过滤器
+ * @param filters.name 插件名称，大小写不敏感，match 匹配。
+ * @param filters.version 插件版本，全等匹配
+ * @param filters.latest 是否只返回最新版本
+ * @param filters.platform 只返回指定平台
+ * @param filters.libraryId 只在指定插件库中寻找
  * @returns 包含插件信息和所在库 ID 的对象数组
  */
-export async function findPlugin(
-  query: string,
-  libraryId?: string
-): Promise<Array<{ libraryId: string; plugin: PluginEntry }>> {
+export async function findPlugin(filters: {
+  name?: string;
+  pluginVersion?: string;
+  latest?: boolean;
+  platform?: SupportedPlatform;
+  libraryId?: string;
+}): Promise<PluginEntry[]> {
   const libraries = await getAllLibraries();
-  const results = [];
-  const lowercaseQuery = query.toLowerCase();
+  const results: PluginEntry[] = [];
 
-  const searchLibraries = libraryId
-    ? { [libraryId]: libraries[libraryId] }
+  const searchLibraries = filters.libraryId
+    ? { [filters.libraryId]: libraries[filters.libraryId] }
     : libraries;
 
-  if (libraryId && !searchLibraries[libraryId]) {
-    throw new Error(`Library with ID "${libraryId}" not found.`);
+  if (filters.libraryId && !searchLibraries[filters.libraryId]) {
+    throw new Error(`Library with ID "${filters.libraryId}" not found.`);
   }
 
-  for (const [currentLibraryId, library] of Object.entries(searchLibraries)) {
-    const matchedPlugins = library.plugins.filter((plugin) =>
-      plugin.info.name.toLowerCase().includes(lowercaseQuery)
-    );
+  for (const library of Object.values(searchLibraries)) {
+    let filteredPlugins = library.plugins;
 
-    results.push(
-      ...matchedPlugins.map((plugin) => ({
-        libraryId: currentLibraryId,
-        plugin,
-      }))
-    );
+    if (filters.name) {
+      const lowercaseName = filters.name.toLowerCase();
+      filteredPlugins = filteredPlugins.filter((plugin) =>
+        plugin.info.name.toLowerCase().includes(lowercaseName)
+      );
+    }
+
+    if (filters.pluginVersion) {
+      filteredPlugins = filteredPlugins.filter(
+        (plugin) => plugin.info.version === filters.pluginVersion
+      );
+    }
+
+    if (filters.platform) {
+      filteredPlugins = filteredPlugins.filter((plugin) =>
+        plugin.info.platform.includes(filters.platform!)
+      );
+    }
+
+    results.push(...filteredPlugins);
+  }
+
+  if (filters.latest) {
+    const latestVersions = new Map<string, PluginEntry>();
+    for (const plugin of results) {
+      const currentLatest = latestVersions.get(plugin.info.name);
+      if (
+        !currentLatest ||
+        sortVersions([plugin.info.version, currentLatest.info.version])[0] ===
+          plugin.info.version
+      ) {
+        latestVersions.set(plugin.info.name, plugin);
+      }
+    }
+    return Array.from(latestVersions.values());
   }
 
   return results;

@@ -24,9 +24,8 @@ export async function installOrUpdatePlugin(
   // 获取新插件信息
   const newPluginInfo = await getPluginInfoWithCache(pluginPath);
   const newPluginInfoThisPlatform =
-    newPluginInfo.find((p) => {
-      p.platform.includes(server.platform);
-    }) ?? newPluginInfo[0];
+    newPluginInfo.find((p) => p.platform.includes(server.platform)) ??
+    newPluginInfo[0];
 
   // 查找并删除同名插件（如果存在）
   const existingPlugins = await listPlugins(serverId);
@@ -80,9 +79,7 @@ export async function listPlugins(serverId: string): Promise<PluginEntry[]> {
     const info = await getPluginInfoWithCache(jarPath);
     const hash = await getFileHash(jarPath);
     const thisPlatformInfo =
-      info.find((p) => {
-        p.platform.includes(server.platform);
-      }) ?? info[0];
+      info.find((p) => p.platform.includes(server.platform)) ?? info[0];
     plugins.push({ info: thisPlatformInfo, hash, jarPath });
   }
 
