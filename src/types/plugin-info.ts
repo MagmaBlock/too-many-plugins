@@ -9,3 +9,10 @@ export type PluginInfo = {
   softdepend: string[];
   platform: SupportedPlatform[];
 };
+
+export interface PluginCacheEntry {
+  info: PluginInfo;
+  hash: string;
+}
+
+export type PluginCache = Record<string, PluginCacheEntry>;

@@ -1,10 +1,10 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { Libraries, Library, PluginEntry } from "../../types/library";
+import semver from "semver";
 import { storage } from "../../db/db";
+import { Libraries, Library, PluginEntry } from "../../types/library";
 import { getJarFiles } from "../folder/get-jar-files";
-import { getPluginInfo } from "../jar/get-plugin-info";
+import { getFileHash, getPluginInfoWithCache } from "../jar/plugin-info-cache";
 
 const LIBRARIES_KEY = "tmp:plugin:libraries";
 
@@ -129,14 +129,12 @@ export async function updateLibraryIndex(
       continue;
     }
 
-    const pluginInfos = getPluginInfo(jarFile);
-    for (const info of pluginInfos) {
-      newPlugins.push({
-        info,
-        hash,
-        jarPath: jarFile,
-      });
-    }
+    const info = await getPluginInfoWithCache(jarFile);
+    newPlugins.push({
+      info,
+      hash,
+      jarPath: jarFile,
+    });
   }
 
   // 移除无效的索引
@@ -155,24 +153,35 @@ export async function updateLibraryIndex(
 }
 
 /**
- * 在所有插件库中查找指定的插件
- * @param query 要查找的插件名称，大小写敏感
+ * 在指定的插件库或所有插件库中查找指定的插件（大小写不敏感）
+ * @param query 要查找的插件名称，大小写不敏感
+ * @param libraryId 可选参数，指定要搜索的库的 ID。如果不提供，则在所有库中搜索
  * @returns 包含插件信息和所在库 ID 的对象数组
  */
 export async function findPlugin(
-  query: string
+  query: string,
+  libraryId?: string
 ): Promise<Array<{ libraryId: string; plugin: PluginEntry }>> {
   const libraries = await getAllLibraries();
   const results = [];
+  const lowercaseQuery = query.toLowerCase();
 
-  for (const [libraryId, library] of Object.entries(libraries)) {
+  const searchLibraries = libraryId
+    ? { [libraryId]: libraries[libraryId] }
+    : libraries;
+
+  if (libraryId && !searchLibraries[libraryId]) {
+    throw new Error(`Library with ID "${libraryId}" not found.`);
+  }
+
+  for (const [currentLibraryId, library] of Object.entries(searchLibraries)) {
     const matchedPlugins = library.plugins.filter((plugin) =>
-      plugin.info.name.includes(query)
+      plugin.info.name.toLowerCase().includes(lowercaseQuery)
     );
 
     results.push(
       ...matchedPlugins.map((plugin) => ({
-        libraryId,
+        libraryId: currentLibraryId,
         plugin,
       }))
     );
@@ -182,17 +191,33 @@ export async function findPlugin(
 }
 
 /**
- * 获取文件的 SHA256 哈希值
- * @param filePath 文件路径
- * @returns 文件的 SHA256 哈希值
+ * 对版本号数组进行排序，从新到旧
+ * @param versions 版本号数组
+ * @returns 排序后的版本号数组
  */
-async function getFileHash(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash("sha256");
-    const stream = fs.createReadStream(filePath);
+export function sortVersions(versions: string[]): string[] {
+  return versions.sort((a, b) => {
+    const cleanA = semver.valid(semver.coerce(a));
+    const cleanB = semver.valid(semver.coerce(b));
 
-    stream.on("data", (data) => hash.update(data));
-    stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", reject);
+    if (cleanA && cleanB) {
+      const compareResult = semver.rcompare(cleanA, cleanB);
+      if (compareResult !== 0) {
+        return compareResult;
+      }
+    }
+
+    // 如果版本号相同或无法比较，将非 SNAPSHOT 版本排在前面
+    const aIsSnapshot = a.includes("SNAPSHOT");
+    const bIsSnapshot = b.includes("SNAPSHOT");
+    if (aIsSnapshot && !bIsSnapshot) {
+      return 1;
+    }
+    if (!aIsSnapshot && bIsSnapshot) {
+      return -1;
+    }
+
+    // 如果都是 SNAPSHOT 或都不是 SNAPSHOT，保持原有顺序
+    return 0;
   });
 }

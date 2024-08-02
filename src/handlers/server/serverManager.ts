@@ -1,4 +1,3 @@
-// serverManager.ts
 import path from "node:path";
 import fs from "node:fs/promises";
 import { ServerEntry, ServerList } from "../../types/server";
@@ -22,7 +21,7 @@ export async function getAllServers(): Promise<ServerList> {
  * @param serverPath 服务端的路径
  * @param platform 服务端平台
  * @returns 添加的服务端对象
- * @throws 如果服务端已存在或路径无效
+ * @throws 如果服务端已存在、路径无效或平台类型不正确
  */
 export async function addServer(
   id: string,
@@ -32,6 +31,10 @@ export async function addServer(
   const servers = await getAllServers();
   if (servers[id]) {
     throw new Error("Server with this ID already exists");
+  }
+
+  if (!Object.values(SupportedPlatform).includes(platform)) {
+    throw new Error("Invalid platform type");
   }
 
   const absolutePath = path.resolve(serverPath);
@@ -71,7 +74,7 @@ export async function removeServer(id: string): Promise<boolean> {
  * @param id 服务端的 ID
  * @param updates 要更新的字段
  * @returns 更新后的服务端对象
- * @throws 如果服务端不存在
+ * @throws 如果服务端不存在、路径无效或平台类型不正确
  */
 export async function updateServer(
   id: string,
@@ -80,6 +83,13 @@ export async function updateServer(
   const servers = await getAllServers();
   if (!servers[id]) {
     throw new Error("Server not found");
+  }
+
+  if (
+    updates.platform &&
+    !Object.values(SupportedPlatform).includes(updates.platform)
+  ) {
+    throw new Error("Invalid platform type");
   }
 
   if (updates.path) {
@@ -108,13 +118,4 @@ export async function getServer(id: string): Promise<ServerEntry> {
     throw new Error("Server not found");
   }
   return servers[id];
-}
-
-/**
- * 列出所有服务端
- * @returns 所有服务端对象的数组
- */
-export async function listServers(): Promise<ServerEntry[]> {
-  const servers = await getAllServers();
-  return Object.values(servers);
 }

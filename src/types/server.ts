@@ -1,5 +1,3 @@
-// types.ts
-
 import { PluginInfo } from "./plugin-info";
 import { SupportedPlatform } from "./supported-platform";
 

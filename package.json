@@ -24,13 +24,16 @@
     "@types/adm-zip": "^0.5.5",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
+    "@types/semver": "^7.5.8",
     "typescript": "^5.5.4",
     "unbuild": "^2.0.0"
   },
   "dependencies": {
     "adm-zip": "^0.5.14",
+    "commander": "^12.1.0",
     "consola": "^3.2.3",
     "js-yaml": "^4.1.0",
+    "semver": "^7.6.3",
     "unstorage": "^1.10.2"
   }
 }
