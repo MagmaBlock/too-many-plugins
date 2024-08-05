@@ -1,6 +1,6 @@
 {
   "name": "too-many-plugins",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Minecraft server plugin package manager",
   "type": "module",
   "exports": {
