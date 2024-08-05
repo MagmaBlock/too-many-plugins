@@ -1,7 +1,7 @@
 {
   "name": "too-many-plugins",
   "version": "1.0.0",
-  "description": "",
+  "description": "A Minecraft server plugin package manager",
   "type": "module",
   "exports": {
     ".": {
@@ -22,9 +22,25 @@
     "too-many-plugins": "./dist/index.mjs",
     "tmp": "./dist/index.mjs"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "CLI",
+    "minecraft",
+    "bukkit",
+    "bungeecord",
+    "papermc",
+    "spigot",
+    "velocity",
+    "folia",
+    "CI/CD",
+    "typescript"
+  ],
+  "author": "MagmaBlock",
   "license": "MIT",
+  "homepage": "https://github.com/MagmaBlock/too-many-plugins",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MagmaBlock/too-many-plugins.git"
+  },
   "devDependencies": {
     "@types/adm-zip": "^0.5.5",
     "@types/js-yaml": "^4.0.9",
